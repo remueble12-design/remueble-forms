@@ -1,5 +1,7 @@
 require('dotenv').config();
 const http = require('http');
+const fs = require('fs');
+const path = require('path');
 const { createClient } = require('@supabase/supabase-js');
 
 const supabase = createClient(
@@ -27,10 +29,22 @@ function parseBody(req) {
 
 const server = http.createServer(async (req, res) => {
   res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Methods', 'POST, GET, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
   if (req.method === 'OPTIONS') { res.writeHead(204); return res.end(); }
 
+  // PANEL
+  if (req.method === 'GET' && req.url === '/panel') {
+    const filePath = path.join(__dirname, 'panel.html');
+    fs.readFile(filePath, (err, data) => {
+      if (err) { res.writeHead(404); return res.end('Panel no encontrado'); }
+      res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+      res.end(data);
+    });
+    return;
+  }
+
+  // SUBMIT
   if (req.method === 'POST' && req.url === '/submit') {
     try {
       const data = await parseBody(req);
@@ -52,6 +66,7 @@ const server = http.createServer(async (req, res) => {
       res.end(JSON.stringify({ ok: false, error: e.message }));
     }
 
+  // UPDATE FOTOS
   } else if (req.method === 'POST' && req.url === '/submit/update-fotos') {
     try {
       const data = await parseBody(req);
