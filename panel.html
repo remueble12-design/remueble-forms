@@ -509,7 +509,10 @@
       html += '<td style="font-size:12px">' + (r.contacto||'—') + '</td>';
       html += '<td>' + (r.tipo_de_mueble||'—') + (r.cantidad ? ' ×'+r.cantidad : '') + '</td>';
       html += '<td style="color:var(--text-muted)">' + (r.ubicacion||'—') + '</td>';
-      html += '<td><select class="estado-select" onchange="updateEstado(' + r.id + ',this.value)">';
+      html += '<td style="display:flex;gap:6px;align-items:center">';
+	html += '<button class="btn-fotos" onclick="openModal(' + r.id + ')">' + (fotos.length>0 ? '📷 '+fotos.length : 'Sin fotos') + '</button>';
+html += '<button class="btn-fotos" onclick="openModal(' + r.id + ')" style="background:var(--brown);color:white;border-color:var(--brown)">Ver más</button>';
+html += '</td>';
       ['pendiente','contactado','cerrado','descartado'].forEach(function(e) {
         html += '<option value="' + e + '"' + (r.estado_gestion===e?' selected':'') + '>' + e.charAt(0).toUpperCase()+e.slice(1) + '</option>';
       });
@@ -540,11 +543,20 @@
     if (!r) return;
     document.getElementById('modal-title').textContent = 'Solicitud #' + r.id + ' — ' + (r.flow||'');
     var campos = [
-      ['Nombre', r.nombre], ['Contacto', r.contacto], ['Mueble', r.tipo_de_mueble],
-      ['Cantidad', r.cantidad], ['Estado', r.estado_del_mueble], ['Ubicación', r.ubicacion],
-      ['Precio', r.precio_solicitado ? r.precio_solicitado+'€' : null],
-      ['Logística', r.logistica], ['Nota', r.nota_adicional], ['Descripción', r.descripcion_del_mueble]
-    ];
+  ['Flow', r.flow], ['Nombre', r.nombre], ['Contacto', r.contacto],
+  ['Mueble', r.tipo_de_mueble], ['Cantidad', r.cantidad],
+  ['Estado mueble', r.estado_del_mueble], ['Ubicación', r.ubicacion],
+  ['Precio solicitado', r.precio_solicitado ? r.precio_solicitado+'€' : null],
+  ['Acepta ofertas', r.acepta_ofertas], ['Logística', r.logistica],
+  ['Método restauración', r.metodo_restauracion],
+  ['Interés en historia', r.interes_en_historia],
+  ['Interés en kit', r.interes_en_kit],
+  ['Mejoras deseadas', r.mejoras_deseadas],
+  ['Estado gestión', r.estado_gestion],
+  ['Nota adicional', r.nota_adicional],
+  ['Descripción', r.descripcion_del_mueble],
+  ['Fecha envío', r.fecha_de_envio]
+];
     var infoHtml = '';
     campos.forEach(function(c) {
       if (c[1]) infoHtml += '<div class="modal-info-item"><div class="modal-info-label">' + c[0] + '</div><div class="modal-info-value">' + c[1] + '</div></div>';
