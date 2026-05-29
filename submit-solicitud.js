@@ -32,7 +32,18 @@ const server = http.createServer(async (req, res) => {
   res.setHeader('Access-Control-Allow-Methods', 'POST, GET, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
   if (req.method === 'OPTIONS') { res.writeHead(204); return res.end(); }
-
+// HEALTHCHECK
+  if (req.method === 'GET' && req.url === '/health') {
+    try {
+      await supabase.from('solicitudes').select('id').limit(1);
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ ok: true, ts: new Date().toISOString() }));
+    } catch(e) {
+      res.writeHead(500, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ ok: false, error: e.message }));
+    }
+    return;
+  }
   // PANEL
   if (req.method === 'GET' && req.url === '/panel') {
     const filePath = path.join(__dirname, 'panel.html');
