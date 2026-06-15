@@ -401,7 +401,7 @@
             <th>Mueble</th>
             <th>Ubicación</th>
             <th>Estado</th>
-            <th>Fotos</th>
+            <th>Detalle</th>
           </tr>
         </thead>
         <tbody id="table-body"></tbody>
@@ -508,16 +508,15 @@
       html += '<td><span class="badge badge-' + r.flow + '">' + (r.flow||'—') + '</span></td>';
       html += '<td>' + (r.nombre||'—') + '</td>';
       html += '<td style="font-size:12px">' + (r.contacto||'—') + '</td>';
-      html += '<td>' + (r.tipo_de_mueble||'—') + (r.cantidad ? ' ×'+r.cantidad : '') + '</td>';
-      html += '<td style="color:var(--text-muted)">' + (r.ubicacion||'—') + '</td>';
+      html += '<td>' + formatFurnitureCell(r) + '</td>';
+      html += '<td style="color:var(--text-muted)">' + (getLocation(r)||'—') + '</td>';
       html += '<td><select class="estado-select" onchange="updateEstado(' + r.id + ',this.value,this)">';
       ['pendiente','contactado','cerrado','descartado'].forEach(function(e) {
         html += '<option value="' + e + '"' + (estado===e?' selected':'') + '>' + e.charAt(0).toUpperCase()+e.slice(1) + '</option>';
       });
       html += '</select></td>';
-      html += '<td style="display:flex;gap:6px;align-items:center">';
-      html += '<button class="btn-fotos" onclick="openModal(' + r.id + ')">' + (fotos.length>0 ? '📷 '+fotos.length : 'Sin fotos') + '</button>';
-      html += '<button class="btn-fotos" onclick="openModal(' + r.id + ')" style="background:var(--brown);color:white;border-color:var(--brown)">Ver más</button>';
+      html += '<td>';
+      html += '<button class="btn-fotos" onclick="openModal(' + r.id + ')" style="background:var(--brown);color:white;border-color:var(--brown)" title="' + fotos.length + ' foto(s)">Ver más</button>';
       html += '</td>';
       html += '</tr>';
     });
@@ -553,14 +552,66 @@
     }
   }
 
+  function extractDimensions(value) {
+    var match = String(value || '').match(/(?:^|\n)\s*Medidas:\s*([^\n]+)/i);
+    return match ? match[1].trim() : '';
+  }
+
+  function getDimensions(r) {
+    return r.medidas_mueble || extractDimensions(r.nota_adicional) || extractDimensions(r.descripcion_del_mueble);
+  }
+
+  function extractBillingAddress(value) {
+    var match = String(value || '').match(/(?:^|\n)\s*Direcci[oó]n de facturaci[oó]n:\s*([^\n]+)/i);
+    return match ? match[1].trim() : '';
+  }
+
+  function getLocation(r) {
+    return r.ubicacion || extractBillingAddress(r.nota_adicional);
+  }
+
+  function getQuantity(r) {
+    return r.cantidad || '1';
+  }
+
+  function formatFurnitureCell(r) {
+    if (!r.tipo_de_mueble) return '—';
+    return r.tipo_de_mueble + ' ×' + getQuantity(r);
+  }
+
+  function stripDimensions(value) {
+    return String(value || '')
+      .split(/\n/)
+      .filter(function(line) { return !/^\s*Medidas:/i.test(line); })
+      .join('\n')
+      .trim();
+  }
+
+  function stripBillingAddress(value) {
+    return String(value || '')
+      .split(/\n/)
+      .filter(function(line) { return !/^\s*Direcci[oó]n de facturaci[oó]n:/i.test(line); })
+      .join('\n')
+      .trim();
+  }
+
+  function cleanNotes(value) {
+    return stripBillingAddress(stripDimensions(value));
+  }
+
   function openModal(id) {
     var r = allData.find(function(x){ return x.id === id; });
     if (!r) return;
     document.getElementById('modal-title').textContent = 'Solicitud #' + r.id + ' — ' + (r.flow||'');
+    var medidas = getDimensions(r);
+    var nota = cleanNotes(r.nota_adicional);
+    var descripcion = stripDimensions(r.descripcion_del_mueble);
+    var ubicacion = getLocation(r);
     var campos = [
   ['Flow', r.flow], ['Nombre', r.nombre], ['Contacto', r.contacto],
-  ['Mueble', r.tipo_de_mueble], ['Cantidad', r.cantidad],
-  ['Estado mueble', r.estado_del_mueble], ['Ubicación', r.ubicacion],
+  ['Mueble', r.tipo_de_mueble], ['Cantidad', getQuantity(r)],
+  ['Medidas', medidas],
+  ['Estado mueble', r.estado_del_mueble], ['Ubicación', ubicacion],
   ['Precio solicitado', r.precio_solicitado ? r.precio_solicitado+'€' : null],
   ['Acepta ofertas', r.acepta_ofertas], ['Logística', r.logistica],
   ['Método restauración', r.metodo_restauracion],
@@ -568,8 +619,8 @@
   ['Interés en kit', r.interes_en_kit],
   ['Mejoras deseadas', r.mejoras_deseadas],
   ['Estado gestión', r.estado_gestion],
-  ['Nota adicional', r.nota_adicional],
-  ['Descripción', r.descripcion_del_mueble],
+  ['Nota adicional', nota],
+  ['Descripción', descripcion],
   ['Fecha envío', r.fecha_de_envio]
 ];
     var infoHtml = '';
@@ -602,11 +653,16 @@
       return true;
     });
 
-    var cols = ['id','created_at','flow','nombre','contacto','tipo_de_mueble','cantidad','estado_del_mueble','ubicacion','precio_solicitado','acepta_ofertas','logistica','estado_gestion','nota_adicional','descripcion_del_mueble','fotos_subidas'];
+    var cols = ['id','created_at','flow','nombre','contacto','tipo_de_mueble','cantidad','medidas_mueble','estado_del_mueble','ubicacion','precio_solicitado','acepta_ofertas','logistica','estado_gestion','nota_adicional','descripcion_del_mueble','fotos_subidas'];
     var csv = cols.join(';') + '\n';
     filtered.forEach(function(r) {
       csv += cols.map(function(c) {
         var v = r[c] || '';
+        if (c === 'medidas_mueble') v = getDimensions(r);
+        if (c === 'cantidad') v = getQuantity(r);
+        if (c === 'ubicacion') v = getLocation(r);
+        if (c === 'nota_adicional') v = cleanNotes(r.nota_adicional);
+        if (c === 'descripcion_del_mueble') v = stripDimensions(r.descripcion_del_mueble);
         return '"' + String(v).replace(/"/g,'""') + '"';
       }).join(';') + '\n';
     });
