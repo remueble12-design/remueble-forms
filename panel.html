@@ -501,6 +501,7 @@
     filtered.forEach(function(r) {
       var fecha = new Date(r.created_at).toLocaleDateString('es-ES', {day:'2-digit',month:'2-digit',year:'2-digit',hour:'2-digit',minute:'2-digit'});
       var fotos = r.fotos_subidas ? r.fotos_subidas.split(',').map(s=>s.trim()).filter(Boolean) : [];
+      var estado = r.estado_gestion || 'pendiente';
       html += '<tr>';
       html += '<td style="font-weight:600;color:var(--brown)">#' + r.id + '</td>';
       html += '<td style="color:var(--text-muted);font-size:12px">' + fecha + '</td>';
@@ -509,33 +510,47 @@
       html += '<td style="font-size:12px">' + (r.contacto||'—') + '</td>';
       html += '<td>' + (r.tipo_de_mueble||'—') + (r.cantidad ? ' ×'+r.cantidad : '') + '</td>';
       html += '<td style="color:var(--text-muted)">' + (r.ubicacion||'—') + '</td>';
-      html += '<td style="display:flex;gap:6px;align-items:center">';
-	html += '<button class="btn-fotos" onclick="openModal(' + r.id + ')">' + (fotos.length>0 ? '📷 '+fotos.length : 'Sin fotos') + '</button>';
-html += '<button class="btn-fotos" onclick="openModal(' + r.id + ')" style="background:var(--brown);color:white;border-color:var(--brown)">Ver más</button>';
-html += '</td>';
+      html += '<td><select class="estado-select" onchange="updateEstado(' + r.id + ',this.value,this)">';
       ['pendiente','contactado','cerrado','descartado'].forEach(function(e) {
-        html += '<option value="' + e + '"' + (r.estado_gestion===e?' selected':'') + '>' + e.charAt(0).toUpperCase()+e.slice(1) + '</option>';
+        html += '<option value="' + e + '"' + (estado===e?' selected':'') + '>' + e.charAt(0).toUpperCase()+e.slice(1) + '</option>';
       });
       html += '</select></td>';
-      html += '<td><button class="btn-fotos" onclick="openModal(' + r.id + ')"' + (fotos.length===0?' ':' ') + '>' + (fotos.length>0 ? '📷 '+fotos.length : 'Sin fotos') + '</button></td>';
+      html += '<td style="display:flex;gap:6px;align-items:center">';
+      html += '<button class="btn-fotos" onclick="openModal(' + r.id + ')">' + (fotos.length>0 ? '📷 '+fotos.length : 'Sin fotos') + '</button>';
+      html += '<button class="btn-fotos" onclick="openModal(' + r.id + ')" style="background:var(--brown);color:white;border-color:var(--brown)">Ver más</button>';
+      html += '</td>';
       html += '</tr>';
     });
     document.getElementById('table-body').innerHTML = html;
   }
 
-  async function updateEstado(id, estado) {
-    await fetch(SB_URL + '/rest/v1/solicitudes?id=eq.' + id, {
-      method: 'PATCH',
-      headers: {
-        'apikey': SB_KEY,
-        'Authorization': 'Bearer ' + SB_KEY,
-        'Content-Type': 'application/json',
-        'Prefer': 'return=minimal'
-      },
-      body: JSON.stringify({ estado_gestion: estado })
-    });
+  async function updateEstado(id, estado, selectEl) {
     var row = allData.find(r=>r.id===id);
-    if (row) row.estado_gestion = estado;
+    var previous = row && row.estado_gestion ? row.estado_gestion : 'pendiente';
+    if (selectEl) selectEl.disabled = true;
+
+    try {
+      var res = await fetch(SB_URL + '/rest/v1/solicitudes?id=eq.' + id, {
+        method: 'PATCH',
+        headers: {
+          'apikey': SB_KEY,
+          'Authorization': 'Bearer ' + SB_KEY,
+          'Content-Type': 'application/json',
+          'Prefer': 'return=minimal'
+        },
+        body: JSON.stringify({ estado_gestion: estado })
+      });
+
+      if (!res.ok) throw new Error('No se pudo actualizar el estado.');
+      if (row) row.estado_gestion = estado;
+      renderTable();
+    } catch(e) {
+      if (row) row.estado_gestion = previous;
+      if (selectEl) selectEl.value = previous;
+      alert('No se pudo actualizar el estado. Inténtalo de nuevo.');
+    } finally {
+      if (selectEl) selectEl.disabled = false;
+    }
   }
 
   function openModal(id) {
