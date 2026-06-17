@@ -173,7 +173,7 @@
   /* STATS */
   .stats {
     display: grid;
-    grid-template-columns: repeat(4, 1fr);
+    grid-template-columns: repeat(5, 1fr);
     gap: 16px;
     margin-bottom: 24px;
   }
@@ -223,6 +223,7 @@
   .badge-vender { background: var(--blue-bg); color: var(--blue); }
   .badge-donar { background: var(--green-bg); color: var(--green); }
   .badge-restaurar { background: var(--orange-bg); color: var(--orange); }
+  .badge-interes_producto { background: #ede7f6; color: #5e35b1; }
   .badge-pendiente { background: #fff8e1; color: #f57f17; }
   .badge-contactado { background: var(--blue-bg); color: var(--blue); }
   .badge-cerrado { background: var(--green-bg); color: var(--green); }
@@ -370,6 +371,10 @@
         <div class="stat-label">Restaurar</div>
         <div class="stat-value" id="stat-restaurar">—</div>
       </div>
+      <div class="stat-card">
+        <div class="stat-label">Interés producto</div>
+        <div class="stat-value" id="stat-producto">—</div>
+      </div>
     </div>
 
     <div class="filters">
@@ -377,6 +382,7 @@
       <button class="filter-btn" onclick="setFlow('vender',this)">Vender</button>
       <button class="filter-btn" onclick="setFlow('donar',this)">Donar</button>
       <button class="filter-btn" onclick="setFlow('restaurar',this)">Restaurar</button>
+      <button class="filter-btn" onclick="setFlow('interes_producto',this)">Interés producto</button>
       <select class="filter-estado" id="filter-estado" onchange="renderTable()">
         <option value="">Todos los estados</option>
         <option value="pendiente">Pendiente</option>
@@ -447,6 +453,44 @@
     document.getElementById('login-pass').value = '';
   }
 
+  function escapeHtml(value) {
+    return String(value == null ? '' : value).replace(/[&<>"']/g, function(char) {
+      return {
+        '&': '&amp;',
+        '<': '&lt;',
+        '>': '&gt;',
+        '"': '&quot;',
+        "'": '&#39;'
+      }[char];
+    });
+  }
+
+  function escapeAttr(value) {
+    return escapeHtml(value);
+  }
+
+  function isSafeUrl(value) {
+    try {
+      var url = new URL(String(value || ''), window.location.href);
+      return url.protocol === 'http:' || url.protocol === 'https:';
+    } catch(e) {
+      return false;
+    }
+  }
+
+  function isProductInterestFlow(flow) {
+    return flow === 'interes_producto';
+  }
+
+  function getFlowLabel(flow) {
+    if (isProductInterestFlow(flow)) return 'Interés producto';
+    return flow || '—';
+  }
+
+  function getFlowClass(flow) {
+    return 'badge-' + String(flow || 'sin-flow').replace(/[^a-z0-9_-]/gi, '').toLowerCase();
+  }
+
   async function loadData() {
     try {
       var res = await fetch(SB_URL + '/rest/v1/solicitudes?select=*&order=created_at.desc', {
@@ -468,6 +512,7 @@
     document.getElementById('stat-vender').textContent = allData.filter(r=>r.flow==='vender').length;
     document.getElementById('stat-donar').textContent = allData.filter(r=>r.flow==='donar').length;
     document.getElementById('stat-restaurar').textContent = allData.filter(r=>r.flow==='restaurar').length;
+    document.getElementById('stat-producto').textContent = allData.filter(r=>isProductInterestFlow(r.flow)).length;
     document.getElementById('topbar-count').textContent = allData.length + ' solicitudes';
   }
 
@@ -502,21 +547,23 @@
       var fecha = new Date(r.created_at).toLocaleDateString('es-ES', {day:'2-digit',month:'2-digit',year:'2-digit',hour:'2-digit',minute:'2-digit'});
       var fotos = r.fotos_subidas ? r.fotos_subidas.split(',').map(s=>s.trim()).filter(Boolean) : [];
       var estado = r.estado_gestion || 'pendiente';
+      var rowId = Number(r.id);
+      var flow = r.flow || '';
       html += '<tr>';
-      html += '<td style="font-weight:600;color:var(--brown)">#' + r.id + '</td>';
+      html += '<td style="font-weight:600;color:var(--brown)">#' + escapeHtml(r.id) + '</td>';
       html += '<td style="color:var(--text-muted);font-size:12px">' + fecha + '</td>';
-      html += '<td><span class="badge badge-' + r.flow + '">' + (r.flow||'—') + '</span></td>';
-      html += '<td>' + (r.nombre||'—') + '</td>';
-      html += '<td style="font-size:12px">' + (r.contacto||'—') + '</td>';
-      html += '<td>' + formatFurnitureCell(r) + '</td>';
-      html += '<td style="color:var(--text-muted)">' + (getLocation(r)||'—') + '</td>';
-      html += '<td><select class="estado-select" onchange="updateEstado(' + r.id + ',this.value,this)">';
+      html += '<td><span class="badge ' + getFlowClass(flow) + '">' + escapeHtml(getFlowLabel(flow)) + '</span></td>';
+      html += '<td>' + escapeHtml(r.nombre||'—') + '</td>';
+      html += '<td style="font-size:12px">' + escapeHtml(r.contacto||'—') + '</td>';
+      html += '<td>' + escapeHtml(formatFurnitureCell(r)) + '</td>';
+      html += '<td style="color:var(--text-muted)">' + escapeHtml(getLocation(r)||'—') + '</td>';
+      html += '<td><select class="estado-select" onchange="updateEstado(' + rowId + ',this.value,this)">';
       ['pendiente','contactado','cerrado','descartado'].forEach(function(e) {
         html += '<option value="' + e + '"' + (estado===e?' selected':'') + '>' + e.charAt(0).toUpperCase()+e.slice(1) + '</option>';
       });
       html += '</select></td>';
       html += '<td>';
-      html += '<button class="btn-fotos" onclick="openModal(' + r.id + ')" style="background:var(--brown);color:white;border-color:var(--brown)" title="' + fotos.length + ' foto(s)">Ver más</button>';
+      html += '<button class="btn-fotos" onclick="openModal(' + rowId + ')" style="background:var(--brown);color:white;border-color:var(--brown)" title="' + fotos.length + ' foto(s)">Ver más</button>';
       html += '</td>';
       html += '</tr>';
     });
@@ -576,6 +623,7 @@
 
   function formatFurnitureCell(r) {
     if (!r.tipo_de_mueble) return '—';
+    if (isProductInterestFlow(r.flow)) return r.tipo_de_mueble;
     return r.tipo_de_mueble + ' ×' + getQuantity(r);
   }
 
@@ -602,13 +650,13 @@
   function openModal(id) {
     var r = allData.find(function(x){ return x.id === id; });
     if (!r) return;
-    document.getElementById('modal-title').textContent = 'Solicitud #' + r.id + ' — ' + (r.flow||'');
+    document.getElementById('modal-title').textContent = 'Solicitud #' + r.id + ' — ' + getFlowLabel(r.flow);
     var medidas = getDimensions(r);
     var nota = cleanNotes(r.nota_adicional);
     var descripcion = stripDimensions(r.descripcion_del_mueble);
     var ubicacion = getLocation(r);
     var campos = [
-  ['Flow', r.flow], ['Nombre', r.nombre], ['Contacto', r.contacto],
+  ['Flow', getFlowLabel(r.flow)], ['Nombre', r.nombre], ['Contacto', r.contacto],
   ['Mueble', r.tipo_de_mueble], ['Cantidad', getQuantity(r)],
   ['Medidas', medidas],
   ['Estado mueble', r.estado_del_mueble], ['Ubicación', ubicacion],
@@ -625,16 +673,19 @@
 ];
     var infoHtml = '';
     campos.forEach(function(c) {
-      if (c[1]) infoHtml += '<div class="modal-info-item"><div class="modal-info-label">' + c[0] + '</div><div class="modal-info-value">' + c[1] + '</div></div>';
+      if (c[1]) infoHtml += '<div class="modal-info-item"><div class="modal-info-label">' + escapeHtml(c[0]) + '</div><div class="modal-info-value">' + escapeHtml(c[1]) + '</div></div>';
     });
     document.getElementById('modal-info').innerHTML = infoHtml;
     var fotos = r.fotos_subidas ? r.fotos_subidas.split(',').map(s=>s.trim()).filter(Boolean) : [];
     var fotosHtml = '';
     if (fotos.length > 0) {
       fotos.forEach(function(url) {
-        fotosHtml += '<a href="' + url + '" target="_blank"><img src="' + url + '" alt="foto" onerror="this.style.display=\'none\'"></a>';
+        if (isSafeUrl(url)) {
+          fotosHtml += '<a href="' + escapeAttr(url) + '" target="_blank" rel="noopener noreferrer"><img src="' + escapeAttr(url) + '" alt="foto" onerror="this.style.display=\'none\'"></a>';
+        }
       });
-    } else {
+    }
+    if (!fotosHtml) {
       fotosHtml = '<div class="no-fotos">No hay fotos en esta solicitud.</div>';
     }
     document.getElementById('modal-fotos').innerHTML = fotosHtml;
